@@ -109,7 +109,8 @@ PlacementAlert is a full-stack web application that automatically monitors Gmail
 
 ## Changelog
 
-- June 24, 2025. Initial setup
+- June 24, 2025. Initial setup with complete placement alert application
+- June 24, 2025. Added PostgreSQL database integration replacing in-memory storage
 
 ## User Preferences
 
