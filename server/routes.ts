@@ -21,6 +21,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET callback for OAuth redirect from Google
+  app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+      const { code, error } = req.query;
+      
+      if (error) {
+        return res.send(`
+          <html>
+            <script>
+              window.opener?.postMessage({ type: 'auth_error', error: '${error}' }, '*');
+              window.close();
+            </script>
+          </html>
+        `);
+      }
+
+      if (!code) {
+        return res.send(`
+          <html>
+            <script>
+              window.opener?.postMessage({ type: 'auth_error', error: 'No authorization code received' }, '*');
+              window.close();
+            </script>
+          </html>
+        `);
+      }
+
+      const tokens = await gmailService.getTokens(code as string);
+      const userInfo = await gmailService.getUserInfo(tokens.access_token!);
+
+      // Create or update user
+      let user = await storage.getUserByEmail(userInfo.email!);
+      
+      if (!user) {
+        user = await storage.createUser({
+          email: userInfo.email!,
+          name: userInfo.name || userInfo.email!,
+        });
+        
+        // Create default settings for new user
+        await storage.createUserSettings({
+          userId: user.id,
+          defaultReminderDays: 3,
+          emailNotifications: true,
+          browserNotifications: false,
+        });
+      }
+
+      // Update user with Gmail tokens
+      await storage.updateUser(user.id, {
+        gmailAccessToken: tokens.access_token,
+        gmailRefreshToken: tokens.refresh_token,
+        gmailTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        isGmailConnected: true,
+      });
+
+      // Send welcome email
+      await notificationService.sendWelcomeEmail(user);
+
+      // Close popup and send success message to parent window
+      res.send(`
+        <html>
+          <script>
+            window.opener?.postMessage({ 
+              type: 'auth_success', 
+              user: ${JSON.stringify(user)},
+              tokens: ${JSON.stringify(tokens)}
+            }, '*');
+            window.close();
+          </script>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Auth callback error:", error);
+      res.send(`
+        <html>
+          <script>
+            window.opener?.postMessage({ type: 'auth_error', error: 'Authentication failed' }, '*');
+            window.close();
+          </script>
+        </html>
+      `);
+    }
+  });
+
   app.post("/api/auth/google/callback", async (req, res) => {
     try {
       const { code } = req.body;

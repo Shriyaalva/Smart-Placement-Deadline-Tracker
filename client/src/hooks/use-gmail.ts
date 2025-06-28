@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -8,6 +8,31 @@ export function useGmail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'auth_success') {
+        localStorage.setItem('user', JSON.stringify(event.data.user));
+        queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/opportunities'] });
+        toast({
+          title: "Gmail Connected!",
+          description: "Your Gmail account has been successfully connected.",
+        });
+        setIsConnecting(false);
+      } else if (event.data.type === 'auth_error') {
+        toast({
+          title: "Authentication Failed",
+          description: event.data.error || "Failed to authenticate with Gmail.",
+          variant: "destructive",
+        });
+        setIsConnecting(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [toast, queryClient]);
+
   const connectGmail = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('GET', '/api/auth/google');
@@ -15,8 +40,18 @@ export function useGmail() {
       return data;
     },
     onSuccess: (data) => {
-      // Redirect to Google OAuth
-      window.location.href = data.authUrl;
+      setIsConnecting(true);
+      // Open Google OAuth in a new window to avoid iframe restrictions
+      const width = 500;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      window.open(
+        data.authUrl,
+        'gmail-auth',
+        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+      );
     },
     onError: () => {
       toast({
@@ -77,10 +112,7 @@ export function useGmail() {
   });
 
   return {
-    connectGmail: () => {
-      setIsConnecting(true);
-      connectGmail.mutate();
-    },
+    connectGmail: connectGmail.mutate,
     handleGmailCallback: handleGmailCallback.mutate,
     syncEmails: syncEmails.mutate,
     isConnecting: isConnecting || connectGmail.isPending,
