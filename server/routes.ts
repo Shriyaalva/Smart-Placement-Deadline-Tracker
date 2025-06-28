@@ -29,7 +29,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Authorization code required" });
       }
 
+      console.log("Attempting to exchange code for tokens...");
       const tokens = await gmailService.getTokens(code);
+      console.log("Tokens received successfully");
+      
       const userInfo = await gmailService.getUserInfo(tokens.access_token!);
 
       // Create or update user
@@ -62,9 +65,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await notificationService.sendWelcomeEmail(user);
 
       res.json({ user, tokens });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Auth callback error:", error);
-      res.status(500).json({ error: "Authentication failed" });
+      
+      // Check for specific Google OAuth errors
+      if (error.message && error.message.includes('redirect_uri_mismatch')) {
+        return res.status(400).json({ 
+          error: "Redirect URI mismatch. Please add your Replit domain to Google Cloud Console.",
+          details: "Add this URI: https://99a94a0a-b002-4924-927c-cb12aa3a32f0-00-6arx1zn2qmm9.janeway.replit.dev/api/auth/google/callback"
+        });
+      }
+      
+      if (error.code === 403 || (error.response && error.response.status === 403)) {
+        return res.status(403).json({ 
+          error: "Google OAuth access forbidden. Check your Google Cloud Console settings.",
+          details: error.message 
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Authentication failed",
+        details: error.message 
+      });
     }
   });
 
