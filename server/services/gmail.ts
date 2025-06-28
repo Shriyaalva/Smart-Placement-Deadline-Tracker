@@ -1,13 +1,17 @@
 import { google } from 'googleapis';
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || "your-client-id";
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET || "your-client-secret";
-const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "http://localhost:5000/api/auth/google/callback";
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = `https://99a94a0a-b002-4924-927c-cb12aa3a32f0-00-6arx1zn2qmm9.janeway.replit.dev/api/auth/google/callback`;
 
 export class GmailService {
   private oauth2Client: any;
 
   constructor() {
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      throw new Error('Google OAuth credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
+    }
+    
     this.oauth2Client = new google.auth.OAuth2(
       CLIENT_ID,
       CLIENT_SECRET,
