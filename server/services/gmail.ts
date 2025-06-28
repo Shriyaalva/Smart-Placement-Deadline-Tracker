@@ -35,8 +35,16 @@ export class GmailService {
   }
 
   async getTokens(authCode: string) {
-    const { tokens } = await this.oauth2Client.getTokens(authCode);
-    return tokens;
+    try {
+      console.log('Attempting to exchange auth code for tokens...');
+      const { tokens } = await this.oauth2Client.getTokens(authCode);
+      console.log('Successfully obtained tokens');
+      return tokens;
+    } catch (error) {
+      console.error('Error getting tokens:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to exchange authorization code: ${errorMessage}`);
+    }
   }
 
   async getUserInfo(accessToken: string) {

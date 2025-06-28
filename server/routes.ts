@@ -38,6 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!code) {
+        console.log('No authorization code received in callback');
         return res.send(`
           <html>
             <script>
@@ -48,6 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
       }
 
+      console.log('Received authorization code, attempting token exchange...');
       const tokens = await gmailService.getTokens(code as string);
       const userInfo = await gmailService.getUserInfo(tokens.access_token!);
 
